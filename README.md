@@ -15,26 +15,33 @@ A fast and minimal socket plugin for SA-MP (San Andreas Multiplayer), designed t
 
 ### Why I Built This Version
 
-The original Socket plugin by BlueG dynamically linked to OpenSSL (`libcrypto` / `libssl`) libraries. This caused runtime issues on modern Windows systems — especially the infamous:
+The original BlueG Socket plugin had a major drawback — it relied on OpenSSL (`libcrypto`, `libeay32.dll`, `ssleay32.dll`) which caused runtime issues on both Linux and Windows:
+
+#### 🐧 Linux Issue
 
 ```ini
 Failed (libcrypto.so.0.9.8: cannot open shared object file: No such file or directory)
 ```
 
-This error occurred because the required OpenSSL DLLs were either:
+#### 🪟 Windows Issue
 
-* Missing from the system,
-* Incompatible with the current version,
-* Or blocked by anti-virus software due to external sourcing.
+```ini
+This application failed to start because libeay32.dll and ssleay32.dll were not found.
+```
 
-To fix this permanently, I rebuilt the plugin **entirely without OpenSSL**, making it:
+These external dependencies were either missing, incompatible, or flagged by antivirus software. Most users had no idea how to get the right versions or where to place them.
 
-* **Statically self-contained**, requiring no external DLLs.
-* **Simpler to distribute**, especially in gamemode releases.
-* **Cross-platform friendly**, with verified builds for both Windows and Linux.
-* **Ready for integration** with custom backend services (like Node.js).
+### ✅ The Solution
 
-This version is ideal for developers who want minimal dependencies and maximum compatibility across client setups.
+I rebuilt the plugin from source and **completely removed OpenSSL**, eliminating these issues:
+
+* 🚫 No more `libcrypto` dependency on Linux
+* 🚫 No more `libeay32.dll` / `ssleay32.dll` needed on Windows
+* ✅ Just drop the plugin and it works — no DLLs, no errors, no headaches
+
+This makes the plugin **lightweight**, **portable**, and **production-ready**, especially for custom backend communication (e.g., Node.js, Python, etc.).
+
+Built to make your SA-MP experience smoother. 💡
 
 ---
 
