@@ -1,5 +1,14 @@
 # SA-MP Socket Plugin (SSL-Free)
 
+![GitHub topic](https://img.shields.io/badge/topic-samp--plugin-blue?logo=github)
+![Built without OpenSSL](https://img.shields.io/badge/SSL-Free-lightgrey?logo=lock)
+![Windows](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
+![Linux](https://img.shields.io/badge/platform-Linux-green?logo=linux)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/RJRYT/samp-socket-plugin?label=release)
+![GitHub license](https://img.shields.io/github/license/RJRYT/samp-socket-plugin)
+![GitHub stars](https://img.shields.io/github/stars/RJRYT/samp-socket-plugin?style=social)
+![GitHub all releases](https://img.shields.io/github/downloads/RJRYT/samp-socket-plugin/total?label=downloads)
+
 A fast and minimal socket plugin for SA-MP (San Andreas Multiplayer), designed to run without SSL and provide simple TCP/UDP communication capabilities for SA-MP scripts.
 
 ---
