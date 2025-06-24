@@ -13,6 +13,31 @@ A fast and minimal socket plugin for SA-MP (San Andreas Multiplayer), designed t
 
 ---
 
+### Why I Built This Version
+
+The original Socket plugin by BlueG dynamically linked to OpenSSL (`libcrypto` / `libssl`) libraries. This caused runtime issues on modern Windows systems — especially the infamous:
+
+```ini
+Failed (libcrypto.so.0.9.8: cannot open shared object file: No such file or directory)
+```
+
+This error occurred because the required OpenSSL DLLs were either:
+
+* Missing from the system,
+* Incompatible with the current version,
+* Or blocked by anti-virus software due to external sourcing.
+
+To fix this permanently, I rebuilt the plugin **entirely without OpenSSL**, making it:
+
+* **Statically self-contained**, requiring no external DLLs.
+* **Simpler to distribute**, especially in gamemode releases.
+* **Cross-platform friendly**, with verified builds for both Windows and Linux.
+* **Ready for integration** with custom backend services (like Node.js).
+
+This version is ideal for developers who want minimal dependencies and maximum compatibility across client setups.
+
+---
+
 ## Installation
 
 ### Prerequisites
