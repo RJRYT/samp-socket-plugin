@@ -1,9 +1,14 @@
 /**
- *
- * Socket Plugin v0.2b
- * (c) BlueG 2012-2014
- *
+ * SA-MP Socket Plugin (SSL-Free)
+ * Version: v1.0.0
+ * 
+ * Originally developed by BlueG (c) 2012–2014
+ * Modified and repackaged as an SSL-free version by the RJRYT.
+ * 
+ * Windows and Linux support (x86)
+ * No OpenSSL dependency – lightweight and clean build.
  */
+
 #if defined socket_included
 	#endinput
 #endif
