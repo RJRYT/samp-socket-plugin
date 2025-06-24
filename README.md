@@ -72,7 +72,7 @@ Output: `Release/socket.so`
 
 ### Windows
 
-#### Requirements
+#### -Requirements
 
 * [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
 * `MSBuild` CLI (included in Build Tools)
@@ -119,6 +119,7 @@ This project is licensed under the MIT License. See [LICENSE](./LICENSE) for mor
 
 * Original by [pBlueG](https://github.com/pBlueG/Socket)
 * SSL-free rebuild and cross-platform packaging by [RJRYT](https://github.com/RJRYT)
+
 ---
 
 ## Releases
