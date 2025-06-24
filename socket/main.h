@@ -40,7 +40,7 @@
 #include "CNatives.h"
 
 
-#define VERSION "0.2b"
+#define VERSION "1.0.0"
 #define INVALID_CLIENT_ID (-1)
 
 typedef void (*logprintf_t)(char* format, ...);
