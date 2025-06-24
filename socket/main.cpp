@@ -126,7 +126,7 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
     pAMXFunctions = ppData[PLUGIN_DATA_AMX_EXPORTS];
     logprintf = (logprintf_t) ppData[PLUGIN_DATA_LOGPRINTF];
 	g_pSocket = new CSocket();
-    logprintf(" Socket plugin v%s loaded.", VERSION);
+    logprintf(" Socket plugin(Updated by RJRYT) v%s loaded.", VERSION);
     return true;
 }
 
@@ -152,14 +152,7 @@ AMX_NATIVE_INFO PluginNatives[] =
 	{"socket_remote_client_connected", n_is_remote_client_connected},
 	{"is_socket_valid", n_is_socket_valid},
 	{"get_remote_client_ip", n_get_remote_client_ip},
-	{"ssl_create_context", n_ssl_create},
-	{"ssl_connect", n_ssl_connect},
-	{"ssl_load_cert_into_context", n_ssl_load_cert},
-	{"ssl_set_mode", n_ssl_set_mode},
 	{"socket_send_array", n_socket_send_array},
-	{"ssl_set_accept_timeout", n_ssl_set_accept_timeout},
-	{"ssl_init", n_ssl_init},
-	{"ssl_get_peer_certificate", n_ssl_get_peer_certificate},
     {0, 0}
 };
 

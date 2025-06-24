@@ -1,13 +1,13 @@
 #pragma once
 
 #pragma warning (disable:4005 4700 996)
+#define HAVE_STDINT_H
+#include <stdint.h>  // ensure types are defined properly
+
 // SA-MP SDK
 #include "../SDK/amx/amx.h"
 #include "../SDK/plugincommon.h"
-// OpenSSL
-#include "openssl/rand.h"
-#include "openssl/ssl.h"
-#include "openssl/err.h"
+
 #if (defined(WIN32) || defined(_WIN32) || defined(_WIN64))
 	#include "windows.h"
 	#include "io.h"

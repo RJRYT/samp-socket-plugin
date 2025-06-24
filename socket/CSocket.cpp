@@ -50,7 +50,6 @@ int CSocket::create_socket(int type)
 		return (-1);
 	}
 	m_pSocketInfo[iSlot].success = true; // initiates that the socket has been successfully created
-	m_pSocketInfo[iSlot].ssl = false;
 	strcpy(m_pSocketInfo[iSlot].bind_ip, "0.0.0.0");
 	return iSlot;
 }
@@ -75,7 +74,6 @@ int CSocket::set_max_connections(int socketid, int maxcon)
 	m_pSocketInfo[socketid].connected_clients = (int*)malloc(sizeof(int)*maxcon);
 	std::fill(m_pSocketInfo[socketid].connected_clients, m_pSocketInfo[socketid].connected_clients+maxcon, INVALID_CLIENT_ID);
 	m_pSocketInfo[socketid].max_clients = maxcon;
-	if(m_pSocketInfo[socketid].ssl) m_pSocketInfo[socketid].ssl_clients = (SSL**)malloc(sizeof(SSL*)*maxcon);
 	return 1;
 }
 
@@ -109,10 +107,8 @@ int CSocket::connect_socket(int socketid, char* address, int port)
 	//set_nonblocking_socket(m_pSocket[socketid]);
 	m_pSocketInfo[socketid].is_client = true; // that way the thread knows the socket will act as a client
 	m_pSocketInfo[socketid].active_thread = true;
-	if(!m_pSocketInfo[socketid].ssl) {
-		set_nonblocking_socket(m_pSocket[socketid]);
-		g_pThread->Start(socket_receive_thread, (void*)socketid);
-	}
+	set_nonblocking_socket(m_pSocket[socketid]);
+	g_pThread->Start(socket_receive_thread, (void*)socketid);
 	return 1;
 }
 
@@ -184,18 +180,13 @@ int CSocket::destroy_socket(int socketid)
 		if(!m_pSocketInfo[socketid].is_client) {
 			for(int i = 0;i < m_pSocketInfo[socketid].max_clients;i++) {
 				if(m_pSocketInfo[socketid].connected_clients[i] != INVALID_CLIENT_ID) {
-					if(m_pSocketInfo[socketid].ssl) SSL_free(m_pSocketInfo[socketid].ssl_clients[i]);
 					close_socket(m_pSocketInfo[socketid].connected_clients[i]);
 					m_pSocketInfo[socketid].connected_clients[i] = INVALID_CLIENT_ID;
 				}
 			}
-			if(m_pSocketInfo[socketid].ssl) free(m_pSocketInfo[socketid].ssl_clients);
 			free(m_pSocketInfo[socketid].connected_clients);
 		}
 		close_socket(m_pSocket[socketid]);
-		if(m_pSocketInfo[socketid].ssl) 
-			SSL_CTX_free(m_pSocketInfo[socketid].ssl_context);
-		//if(m_pSocketInfo[socketid].ssl && m_pSocketInfo[socketid].is_client) SSL_free(m_pSocketInfo[socketid].ssl_handle);
 		m_pSocket[socketid] = (-1);
 		m_pSocketInfo[socketid].listen = false;
 		m_pSocketInfo[socketid].max_clients = 0;
@@ -212,7 +203,6 @@ int CSocket::close_remote_connection(int socketid, int remote_client_id)
 	}
 	int *rem_client = &m_pSocketInfo[socketid].connected_clients[remote_client_id];
 	if(*rem_client != (-1)) {
-		if(m_pSocketInfo[socketid].ssl) SSL_free(m_pSocketInfo[socketid].ssl_clients[remote_client_id]);
 		//shutdown(*rem_client, SD_BOTH);
 		close_socket(*rem_client);
 		*rem_client = (-1);
@@ -226,10 +216,7 @@ int CSocket::send_socket(int socketid, char* data, int len)
 		logprintf("socket_send(): Socket ID %d doesn't exist or hasn't been created yet", socketid);
 		return 0;
 	}
-	if(!m_pSocketInfo[socketid].ssl)
-		return send(m_pSocket[socketid], data, len, 0);
-	else
-		return SSL_write(m_pSocketInfo[socketid].ssl_handle, data, len);
+	return send(m_pSocket[socketid], data, len, 0);
 }
 
 int CSocket::sendto_socket(int socketid, char* ip, int port, char* data, int len)
@@ -253,10 +240,7 @@ int CSocket::sendto_remote_client(int socketid, int remote_clientid, char* data)
 		return 0;
 	}
 	if(m_pSocketInfo[socketid].connected_clients[remote_clientid] != (INVALID_CLIENT_ID))
-		if(!m_pSocketInfo[socketid].ssl)
-			return send(m_pSocketInfo[socketid].connected_clients[remote_clientid], data, strlen(data), 0);
-		else
-			return SSL_write(m_pSocketInfo[socketid].ssl_clients[remote_clientid], data, strlen(data));
+		return send(m_pSocketInfo[socketid].connected_clients[remote_clientid], data, strlen(data), 0);
 	return 0;
 }
 
@@ -269,10 +253,7 @@ int CSocket::socket_send_array(int socketid, cell* aData, int size)
 	char buf[1024];
 	memset(buf, '\0', sizeof(buf));
 	memcpy(buf, aData, size*4);
-	if(!m_pSocketInfo[socketid].ssl)
-		return send(m_pSocket[socketid], buf, size, 0);
-	else
-		return SSL_write(m_pSocketInfo[socketid].ssl_handle, buf, size);
+	return send(m_pSocket[socketid], buf, size, 0);
 }
 
 int CSocket::is_remote_client_connected(int socketid, int remote_clientid)
@@ -283,13 +264,8 @@ int CSocket::is_remote_client_connected(int socketid, int remote_clientid)
 	}
 	char tempbuf[1024];
 	if(remote_clientid <= m_pSocketInfo[socketid].max_clients && m_pSocketInfo[socketid].connected_clients[remote_clientid] != (-1)) {
-		if(m_pSocketInfo[socketid].ssl) {
-			if(recv(m_pSocketInfo[socketid].connected_clients[remote_clientid], tempbuf, sizeof(tempbuf), NULL) != 0)
-				return 1;
-		} else {
-			if(SSL_read(m_pSocketInfo[socketid].ssl_clients[remote_clientid], tempbuf, 1024) != 0)
-				return 1;
-		}
+		if(recv(m_pSocketInfo[socketid].connected_clients[remote_clientid], tempbuf, sizeof(tempbuf), NULL) != 0)
+			return 1;
 	}
 	return 0;
 }
@@ -342,113 +318,6 @@ void CSocket::close_socket(int socket)
 #endif
 }
 
-int CSocket::ssl_create(int socketid, int method)
-{
-	if(m_pSocket[socketid] == -1) {
-		logprintf("ssl_create(): Socket ID %d does not exist.", socketid);
-		return 0;
-	}
-#if (defined(WIN32) || defined(_WIN32) || defined(_WIN64))
-	const SSL_METHOD *ssl_method;
-#else
-	SSL_METHOD **ssl_method;
-#endif
-	ssl_method = ((method) ? SSLv23_server_method() : SSLv23_client_method());
-	m_pSocketInfo[socketid].ssl_context = SSL_CTX_new(ssl_method);
-	if (m_pSocketInfo[socketid].ssl_context == NULL) {
-		ERR_print_errors_fp(stderr);
-		return 0;
-    }
-	if(!method) {
-		m_pSocketInfo[socketid].ssl_handle = SSL_new(m_pSocketInfo[socketid].ssl_context);
-		if(m_pSocketInfo[socketid].ssl_handle == NULL) {
-			ERR_print_errors_fp(stderr);
-			return 0;
-		}
-	}
-	m_pSocketInfo[socketid].ssl = true; 
-	return 1;
-}
-
-int CSocket::ssl_load_cert(int socketid, char* szCert, char* szKey)
-{
-	if(m_pSocket[socketid] == -1) {
-		logprintf("ssl_load_certificate(): Socket ID %d does not exist.", socketid);
-		return 0;
-	}
-	int cert_ret, key_ret;
-	cert_ret = SSL_CTX_use_certificate_file(m_pSocketInfo[socketid].ssl_context, szCert, SSL_FILETYPE_PEM);
-	key_ret = SSL_CTX_use_PrivateKey_file(m_pSocketInfo[socketid].ssl_context, szKey, SSL_FILETYPE_PEM);
-	if((cert_ret && key_ret) && SSL_CTX_check_private_key(m_pSocketInfo[socketid].ssl_context))
-		return 1;
-	else
-		return 0;
-}
-
-int CSocket::ssl_connect(int socketid)
-{
-	if(m_pSocket[socketid] == -1) {
-		logprintf("ssl_connect(): Socket ID %d does not exist.", socketid);
-		return 0;
-	}
-	if (!SSL_set_fd(m_pSocketInfo[socketid].ssl_handle, m_pSocket[socketid])) {
-        ERR_print_errors_fp(stderr);
-		return 0;
-	}
-	int a = SSL_connect(m_pSocketInfo[socketid].ssl_handle);
-	if (a != 1) {
-		logprintf("ssl_connect(): Something has gone wrong %d (Error: %d)", a, SSL_get_error(m_pSocketInfo[socketid].ssl_handle, a));
-        ERR_print_errors_fp(stderr);
-		return 0;
-	}
-	g_pThread->Start(socket_receive_thread, (void*)socketid);
-	return 1;
-}
-
-int CSocket::ssl_set_mode(int socketid, int mode)
-{
-	if(m_pSocket[socketid] == -1) {
-		logprintf("ssl_set_mode(): Socket ID %d does not exist.", socketid);
-		return 0;
-	}
-	return SSL_CTX_set_mode(m_pSocketInfo[socketid].ssl_context, mode);
-}
-
-int CSocket::ssl_set_timeout(int socketid, DWORD dwInterval)
-{
-	if(m_pSocket[socketid] == -1) {
-		logprintf("ssl_set_accept_timeout(): Socket ID %d doesn't exist or hasn't been created yet", socketid);
-		return 0;
-	}
-	if (setsockopt(m_pSocket[socketid], SOL_SOCKET, SO_RCVTIMEO, (char *)&dwInterval, sizeof(dwInterval)) == -1)
-		return 0;
-	else
-		return 1;
-}
-
-int CSocket::ssl_get_peer_certificate(int socketid, int method, int remote_clientid, char* szIssuer, char* szSubject)
-{
-	X509 *cert;
-	if(!method)
-		cert = SSL_get_peer_certificate(m_pSocketInfo[socketid].ssl_handle);
-	else
-		cert = SSL_get_peer_certificate(m_pSocketInfo[socketid].ssl_clients[remote_clientid]);
-	if(cert != NULL) {
-		strcpy(szIssuer, X509_NAME_oneline(X509_get_subject_name(cert), 0, 0));
-		strcpy(szSubject, X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0));
-		X509_free(cert);
-		return 1;
-	}
-	return 0;
-}
-
-void CSocket::ssl_init()
-{
-	OpenSSL_add_all_algorithms();
-	SSL_library_init();
-	SSL_load_error_strings();
-}
-
 #ifdef WIN32
 DWORD socket_connection_thread(void* lpParam)
 #else
@@ -467,16 +336,6 @@ void* socket_connection_thread(void* lpParam)
 			int client = accept(g_pSocket->m_pSocket[sockID], (sockaddr*)&remote_client, &cLen);
 			int slot = g_pSocket->find_free_slot(g_pSocket->m_pSocketInfo[sockID].connected_clients, g_pSocket->m_pSocketInfo[sockID].max_clients);
 			if(client != NULL && client != SOCKET_ERROR && slot != 0xFFFF) {
-				if(g_pSocket->m_pSocketInfo[sockID].ssl) {
-					//logprintf("SSL client detected (Slot %d)", slot);
-					g_pSocket->m_pSocketInfo[sockID].ssl_clients[slot] = SSL_new(g_pSocket->m_pSocketInfo[sockID].ssl_context);
-					int ret_fd = SSL_set_fd(g_pSocket->m_pSocketInfo[sockID].ssl_clients[slot], client);
-					if(SSL_accept(g_pSocket->m_pSocketInfo[sockID].ssl_clients[slot]) != 1) {
-						SSL_free(g_pSocket->m_pSocketInfo[sockID].ssl_clients[slot]);
-						g_pSocket->close_socket(client);
-						continue;
-					}
-				}
 				g_pSocket->set_nonblocking_socket(client);
 				g_pSocket->m_pSocketInfo[sockID].connected_clients[slot] = client;
 				remoteConnect pData;
@@ -557,10 +416,7 @@ void* socket_receive_thread(void* lpParam)
 		if(sockType) {
 			// tcp client
 			int byte_len;
-			if(g_pSocket->m_pSocketInfo[sockID].ssl)
-				byte_len = SSL_read(g_pSocket->m_pSocketInfo[sockID].ssl_handle, szBuffer, 1024);
-			else
-				byte_len = recv(iHandle, szBuffer, sizeof(szBuffer), NULL);
+			byte_len = recv(iHandle, szBuffer, sizeof(szBuffer), NULL);
 			if(byte_len > 0) {
 				//remove_newline(szBuffer);
 				szBuffer[byte_len] = '\0';
@@ -574,7 +430,6 @@ void* socket_receive_thread(void* lpParam)
 			if(!byte_len) {
 				socketClose pData;
 				pData.socketid = sockID;
-				if(g_pSocket->m_pSocketInfo[sockID].ssl) SSL_free(g_pSocket->m_pSocketInfo[sockID].ssl_handle);
 				onSocketClose.push(pData);
 				g_pSocket->destroy_socket(sockID);
 			}
@@ -584,10 +439,7 @@ void* socket_receive_thread(void* lpParam)
 				iHandle = g_pSocket->m_pSocketInfo[sockID].connected_clients[i];
 				if(iHandle != (-1)) {
 					int byte_len;
-					if(g_pSocket->m_pSocketInfo[sockID].ssl)
-						byte_len = SSL_read(g_pSocket->m_pSocketInfo[sockID].ssl_clients[i], szBuffer, 1024);
-					else
-						byte_len = recv(iHandle, szBuffer, sizeof(szBuffer), NULL);
+					byte_len = recv(iHandle, szBuffer, sizeof(szBuffer), NULL);
 					if(byte_len > 0) {
 						//remove_newline(szBuffer);
 						szBuffer[byte_len] = '\0';
@@ -603,7 +455,6 @@ void* socket_receive_thread(void* lpParam)
 						remoteDisconnect pData;
 						pData.remote_clientid = i;
 						pData.socketid = sockID;
-						if(g_pSocket->m_pSocketInfo[sockID].ssl) SSL_free(g_pSocket->m_pSocketInfo[sockID].ssl_clients[i]);
 						g_pSocket->close_socket(iHandle);
 						g_pSocket->m_pSocketInfo[sockID].connected_clients[i] = INVALID_CLIENT_ID; // connection has dropped
 						onRemoteDisconnect.push(pData);
