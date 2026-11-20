@@ -122,7 +122,7 @@ int CSocket::listen_socket(int socketid, int port)
 	memset((char *)&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
-	if(strcmp(m_pSocketInfo[socketid].bind_ip, "0.0.0.0") != 0)
+	if(strcmp(m_pSocketInfo[socketid].bind_ip, "0.0.0.0") == 0)
 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	else
 		addr.sin_addr.s_addr = inet_addr(m_pSocketInfo[socketid].bind_ip);
